@@ -1,0 +1,32 @@
+# Codex and AI agents — local only
+.codex/
+AGENTS.md
+
+# Agent workflow artifacts — local only
+docs/tasks/
+docs/test-plans/
+docs/reports/
+
+# Python virtual environments
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local secrets
+.env
+.env.*
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Test coverage
+.coverage
+htmlcov/
