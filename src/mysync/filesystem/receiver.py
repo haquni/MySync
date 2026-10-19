@@ -2,29 +2,20 @@
 
 import hashlib
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import tempfile
 from typing import Iterable
+
+from mysync.filesystem.paths import UnsafePathError, path_parts
 
 
 class IntegrityError(OSError):
     """Received bytes do not match the expected SHA-256 digest."""
 
 
-class UnsafePathError(ValueError):
-    """A relative path could escape the synchronization root."""
-
-
 def _path_parts(relative_path: str) -> tuple[str, ...]:
-    if not isinstance(relative_path, str):
-        raise TypeError("relative_path must be a string")
-    if not relative_path or "\\" in relative_path:
-        raise UnsafePathError(f"Unsafe relative path: {relative_path!r}")
-    raw_parts = relative_path.split("/")
-    path = PurePosixPath(relative_path)
-    if path.is_absolute() or any(part in ("", ".", "..") for part in raw_parts):
-        raise UnsafePathError(f"Unsafe relative path: {relative_path!r}")
-    return tuple(raw_parts)
+    """Backward-compatible private alias for the shared path validator."""
+    return path_parts(relative_path)
 
 
 def _validate_digest(expected_sha256: str) -> str:
@@ -99,11 +90,13 @@ def receive_new_file(
             raise IntegrityError(f"SHA-256 mismatch: expected {expected}, got {actual}")
         if target.is_symlink():
             raise UnsafePathError(f"Destination became a symbolic link: {target}")
-        if target.exists():
-            raise FileExistsError(target)
-        os.replace(temporary_path, target)
-        temporary_path = None
+        try:
+            os.link(temporary_path, target, follow_symlinks=False)
+        except FileExistsError:
+            raise FileExistsError(target) from None
         installed = True
+        temporary_path.unlink()
+        temporary_path = None
         if mtime_ns is not None:
             os.utime(target, ns=(mtime_ns, mtime_ns), follow_symlinks=False)
         return target

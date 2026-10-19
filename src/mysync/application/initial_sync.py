@@ -38,11 +38,28 @@ def plan_initial_sync(left: ScanResult, right: ScanResult) -> InitialSyncPlan:
     conflict_keys = (left_files.keys() & right_dirs.keys()) | (
         right_files.keys() & left_dirs.keys()
     )
+    conflict_keys |= {
+        key
+        for key in left_dirs.keys() & right_dirs.keys()
+        if left_dirs[key] != right_dirs[key]
+    }
 
     def safe(path: str) -> bool:
         key = path.casefold()
         return all(key != conflict and not key.startswith(conflict + "/")
                    for conflict in conflict_keys)
+
+    def conflict_path(key: str) -> str:
+        candidates: list[str] = []
+        if key in left_files:
+            candidates.append(left_files[key].relative_path)
+        if key in right_files:
+            candidates.append(right_files[key].relative_path)
+        if key in left_dirs:
+            candidates.append(left_dirs[key])
+        if key in right_dirs:
+            candidates.append(right_dirs[key])
+        return min(candidates, key=lambda value: (value.casefold(), value))
 
     return InitialSyncPlan(
         copy_to_left=tuple(entry for entry in diff.added
@@ -56,7 +73,7 @@ def plan_initial_sync(left: ScanResult, right: ScanResult) -> InitialSyncPlan:
         file_conflicts=tuple(change for change in diff.changed
                              if safe(change.before.relative_path)),
         structure_conflicts=tuple(
-            (left_files.get(key) or right_files[key]).relative_path
+            conflict_path(key)
             for key in sorted(conflict_keys)
         ),
     )

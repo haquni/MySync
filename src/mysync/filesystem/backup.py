@@ -132,7 +132,13 @@ def purge_expired_backups(
         raise ValueError("now_ns must be a non-negative integer")
     if isinstance(retention_days, bool) or not isinstance(retention_days, int) or retention_days <= 0:
         raise ValueError("retention_days must be a positive integer")
-    backup_root = Path(root) / "_mysync" / "backups"
+    root = Path(root)
+    if root.is_symlink():
+        raise UnsafePathError(f"Root must not be a symbolic link: {root}")
+    service_root = root / "_mysync"
+    if service_root.is_symlink():
+        raise UnsafePathError(f"Service root must not be a symbolic link: {service_root}")
+    backup_root = service_root / "backups"
     if backup_root.is_symlink():
         raise UnsafePathError(f"Backup root must not be a symbolic link: {backup_root}")
     if not backup_root.exists():

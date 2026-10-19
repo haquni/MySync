@@ -5,6 +5,7 @@ from pathlib import Path
 from stat import S_ISREG
 
 from mysync.core.hashing import sha256_file
+from mysync.filesystem.paths import path_parts
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,7 @@ def scan_directory(root: Path) -> ScanResult:
             if path.is_symlink():
                 continue
             relative_path = path.relative_to(root).as_posix()
+            path_parts(relative_path)
             if path.is_dir():
                 register(relative_path)
                 directories.append(relative_path)

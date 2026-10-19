@@ -5,7 +5,10 @@ import json
 import os
 from pathlib import Path
 import tempfile
+from typing import Any
 from uuid import UUID, uuid4
+
+from mysync.core.identity import validate_device_name
 
 
 class ConfigError(ValueError):
@@ -28,6 +31,10 @@ class AppConfig:
             if not isinstance(value, str) or not value.strip():
                 raise ConfigError(f"{name} must be a non-empty string")
         try:
+            validate_device_name(self.device_name)
+        except ValueError as error:
+            raise ConfigError(str(error)) from error
+        try:
             UUID(self.device_id)
         except (ValueError, AttributeError) as error:
             raise ConfigError("device_id must be a UUID") from error
@@ -45,6 +52,15 @@ class AppConfig:
 def new_device_id() -> str:
     """Return a random canonical UUID string for a new device."""
     return str(uuid4())
+
+
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ConfigError(f"Duplicate configuration field: {key}")
+        result[key] = value
+    return result
 
 
 def save_config(path: Path, config: AppConfig) -> None:
@@ -83,7 +99,7 @@ def load_config(path: Path) -> AppConfig:
     path = Path(path)
     try:
         with path.open("r", encoding="utf-8") as stream:
-            payload = json.load(stream)
+            payload = json.load(stream, object_pairs_hook=_unique_object)
     except json.JSONDecodeError as error:
         raise ConfigError(f"Invalid JSON configuration: {error}") from error
     if not isinstance(payload, dict):
@@ -98,7 +114,8 @@ def load_config(path: Path) -> AppConfig:
         missing = sorted(expected - actual)
         extra = sorted(actual - expected)
         raise ConfigError(f"Configuration fields differ; missing={missing}, extra={extra}")
-    if payload["schema_version"] != 1:
+    schema_version = payload["schema_version"]
+    if isinstance(schema_version, bool) or not isinstance(schema_version, int) or schema_version != 1:
         raise ConfigError(f"Unsupported schema version: {payload['schema_version']!r}")
     values = {key: value for key, value in payload.items() if key != "schema_version"}
     try:

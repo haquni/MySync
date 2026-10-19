@@ -10,6 +10,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
 
+[project.scripts]
+MySync = "mysync.cli:main"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 
